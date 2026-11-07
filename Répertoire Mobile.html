@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Répertoire">
+<title>Répertoire patients</title>
+<style>
+:root{--bg:#f3f6f5;--surface:#fff;--ink:#1f2d2b;--muted:#61716e;--line:#d5dfdc;--accent:#2f6f6a;--accent-ink:#fff;--sel:#e1eeec;--danger:#a63d3d;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#161d1c;--surface:#1f2928;--ink:#e6eeec;--muted:#98aaa6;--line:#324240;--accent:#6fb5ae;--accent-ink:#10201e;--sel:#2a3a38;--danger:#e08a8a}}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 -apple-system,system-ui,"Segoe UI",Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
+.brand{display:flex;align-items:center;gap:12px;max-width:640px;margin:0 auto;padding:18px 16px 0;font-weight:600}
+.psi{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 1.4rem/1 Georgia,"Times New Roman",serif}
+main{max-width:640px;margin:0 auto;padding:8px 16px 32px}
+h1{font-size:1.4rem;margin:12px 0;font-weight:650}
+button,input{font:inherit;color:inherit}
+.open{display:block;width:100%;padding:13px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+input[type=file]{display:none}
+#q{width:100%;margin:12px 0 4px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+#state{margin:8px 2px 10px;color:var(--muted);font-size:.95rem}
+#state.err{color:var(--danger)}
+ul{list-style:none;margin:0;padding:0}
+details{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+summary{display:flex;justify-content:space-between;gap:10px;padding:13px 16px;font-weight:600;cursor:pointer;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--accent);font-weight:400;font-size:1.4rem;line-height:1}
+details[open] summary::after{content:"–"}
+details[open] summary{border-bottom:1px solid var(--line)}
+dl{margin:0;padding:4px 16px 14px}
+dt{margin-top:10px;font-size:.88rem;color:var(--muted)}
+dd{margin:2px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<div class="brand"><span class="psi" aria-hidden="true">Ψ</span><span>Psychologue clinicienne, Estelle Monteiro</span></div>
+<main>
+  <h1>Répertoire patients</h1>
+  <button class="open" id="open" type="button">Ouvrir le répertoire</button>
+  <input type="file" id="file" accept=".json,application/json">
+  <input type="search" id="q" placeholder="Rechercher un nom, un téléphone…" aria-label="Rechercher un patient" autocomplete="off" hidden>
+  <p id="state" role="status">Choisissez le fichier patients.json dans l’app Fichiers.</p>
+  <ul id="list"></ul>
+</main>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var LABELS=[["naissance","Date de naissance"],["annee","Année du premier rendez-vous"],["tel","Téléphone"],["email","E-mail"],["note","Note de contexte"]];
+  var patients=[];
+  function norm(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()}
+  function fmtDate(v){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v);return m?m[3]+"/"+m[2]+"/"+m[1]:v}
+  function render(){
+    var q=norm($("q").value.trim()),ul=$("list"),n=0;ul.textContent="";
+    patients.forEach(function(p){
+      if(q&&p.hay.indexOf(q)===-1)return;
+      n++;
+      var li=document.createElement("li"),d=document.createElement("details"),s=document.createElement("summary"),dl=document.createElement("dl");
+      s.textContent=p.title;d.appendChild(s);
+      LABELS.forEach(function(l){
+        var v=p.raw[l[0]];if(v===undefined||v===null||String(v).trim()==="")return;
+        var dt=document.createElement("dt"),dd=document.createElement("dd");
+        dt.textContent=l[1];dd.textContent=l[0]==="naissance"?fmtDate(String(v)):String(v);
+        dl.appendChild(dt);dl.appendChild(dd);
+      });
+      d.appendChild(dl);li.appendChild(d);ul.appendChild(li);
+    });
+    $("state").className="";
+    $("state").textContent=!patients.length?"Le fichier ne contient aucun patient.":!n?"Aucun résultat pour cette recherche.":n+(n>1?" patients":" patient");
+  }
+  function load(f){
+    var r=new FileReader();
+    r.onload=function(){
+      try{
+        var d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;
+        patients=d.filter(function(p){return p&&typeof p==="object"}).map(function(p){
+          var nom=String(p.nom||"").trim(),pre=String(p.prenom||"").trim();
+          return{raw:p,nom:nom,pre:pre,title:((nom.toUpperCase()+" "+pre).trim())||"Sans nom",
+            hay:norm(["prenom","nom","naissance","annee","tel","email","note"].map(function(k){return p[k]||""}).join(" "))};
+        }).sort(function(a,b){return(a.nom+a.pre).localeCompare(b.nom+b.pre,"fr")});
+        $("q").hidden=false;$("q").value="";$("open").textContent="Choisir un autre fichier";render();
+      }catch(e){
+        patients=[];$("list").textContent="";$("q").hidden=true;
+        $("state").className="err";$("state").textContent="Ce fichier n’est pas lisible. Choisissez patients.json.";
+      }
+    };
+    r.onerror=function(){$("state").className="err";$("state").textContent="Le fichier n’a pas pu être ouvert. Réessayez."};
+    r.readAsText(f,"utf-8");
+  }
+  $("open").addEventListener("click",function(){$("file").click()});
+  $("file").addEventListener("change",function(){var f=this.files[0];if(f)load(f);this.value=""});
+  $("q").addEventListener("input",render);
+})();
+</script>
+</body>
+</html>
