@@ -1,2 +1,2 @@
-# R-pertoire_psy
+# Repertoire
 Répertoire simple avec base de données JSON en local
